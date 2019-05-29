@@ -166,9 +166,9 @@ def test_2_batches(enable_ar, is_multiplicative, dataset_2_batch, model_coeffs_a
                          phis=[model_coeffs_ar['phi']]
                          )(dataset_2_batch.torch_ts.view(2, -1, 1))
 
-    assert torch.allclose(torch.cat([ref_1.mean, ref_2.mean], dim=2), ref_all.mean)
-    assert torch.allclose(torch.cat([ref_1.yhat, ref_2.yhat], dim=2), ref_all.yhat)
-    assert torch.allclose(torch.cat([ref_1.e, ref_2.e], dim=2), ref_all.e)
+    assert torch.allclose(torch.cat([ref_1.mean, ref_2.mean], dim=0), ref_all.mean)
+    assert torch.allclose(torch.cat([ref_1.yhat, ref_2.yhat], dim=0), ref_all.yhat)
+    assert torch.allclose(torch.cat([ref_1.e, ref_2.e], dim=0), ref_all.e)
 
 
 @pytest.mark.parametrize("enable_ar", [True, False])
