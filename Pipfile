@@ -1,0 +1,24 @@
+[[source]]
+url="https://pypi.python.org/simple"
+verify_ssl=true
+name="pypi"
+
+[packages]
+torch="~=1.1.0"
+numpy="~=1.16.3"
+rpy2 = "*"
+
+[dev-packages]
+pandas="~=0.24"
+tzlocal="~=1.5"
+ipdb="~=0.11"
+pep8="~=1.7"
+flake8="~=3.6"
+flake8-debugger="~=3.1"
+flake8-print="~=3.1"
+pep8-naming="~=0.7"
+flake8-blind-except="~=0.1.1"
+flake8-import-order="~=0.18"
+coverage="~=4.5"
+pytest="~=3.9"
+twine = "*"
