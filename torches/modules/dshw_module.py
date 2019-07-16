@@ -111,8 +111,8 @@ class DSHWModule(nn.Module):
             Ico = Ic.clone()
             wco = wc.clone()
 
-            Ico[:, i % self.period1, :] = gammas * (y[:, i, :] - (snew - wc[:, i % self.period2, :])) + (1 - gammas) * Ic[:, i % self.period1, :]
-            wco[:, i % self.period2, :] = omegas * (y[:, i, :] - (snew - Ic[:, i % self.period1, :])) + (1 - omegas) * wc[:, i % self.period2, :]
+            Ico[:, i % self.period1, :] = gammas * (y[:, i, :] - (snew + wc[:, i % self.period2, :])) + (1 - gammas) * Ic[:, i % self.period1, :]
+            wco[:, i % self.period2, :] = omegas * (y[:, i, :] - (snew + Ic[:, i % self.period1, :])) + (1 - omegas) * wc[:, i % self.period2, :]
             Ic = Ico
             wc = wco
 
