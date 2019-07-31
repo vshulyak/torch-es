@@ -31,9 +31,11 @@ class PipelineModel(nn.Module):
         # init
         [sc.init() for sc in stateful_containers]
 
+        # state is initialized at the beginning of each sequence. Then the result from i step is carried to i+1 step.
+        state = None
+
         # step
         for i in range(x.size(1)):
-            state = None  # TODO: Check if this influenced the result (I moved it inside the loop)
             for sc in stateful_containers:
                 state = sc.step(i, state)
         del state  # needed?
