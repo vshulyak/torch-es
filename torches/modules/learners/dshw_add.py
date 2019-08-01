@@ -41,8 +41,8 @@ class HWStatefulContainer(BaseStatefulContainer):
 
     def init(self):
 
-        period1_mask = self.seas_mask[:, :, 0]
-        period2_mask = self.seas_mask[:, :, 1]
+        period1_mask = self.seas_mask[:, :self.period1, 0]
+        period2_mask = self.seas_mask[:, :self.period2, 1]
 
         Ic = []
         wc = []
@@ -94,6 +94,7 @@ class HWStatefulContainer(BaseStatefulContainer):
     def forecast(self, h):
         Ic = torch.roll(self.Ic, -self.n % self.period1, dims=1)
         wc = torch.roll(self.wc, -self.n % self.period2, dims=1)
+
         t = self.t
         s = self.s
 
