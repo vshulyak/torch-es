@@ -2,7 +2,7 @@ import pytest
 
 import rpy2.robjects as ro
 
-from .utils.fixtures import DataSetOneFixture, DataSet2FeatureFixture, DataSet2BatchFixture, DataSet2Batch2FeatureFixture
+from ..utils.fixtures import DataSetOneFixture, DataSet2FeatureFixture, DataSet2BatchFixture, DataSet2Batch2FeatureFixture
 
 
 @pytest.fixture(scope="module")

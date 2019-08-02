@@ -21,7 +21,7 @@ def add_init_level_trend(y, period1, period2):
     return t, s
 
 
-class HWStatefulContainer(BaseStatefulContainer):
+class HWOffsetBasedStatefulContainer(BaseStatefulContainer):
 
     def __init__(self, learner, x, seas_mask, exog_cat, exog_cnt):
         super().__init__(learner, x, seas_mask, exog_cat, exog_cnt)
@@ -41,8 +41,17 @@ class HWStatefulContainer(BaseStatefulContainer):
 
     def init(self):
 
-        self.Ic = self.init_Ic.view(1, -1, 1).repeat(self.bs, 1, 1)
-        self.wc = self.init_wc.view(1, -1, 1).repeat(self.bs, 1, 1)
+        period1_mask = self.seas_mask[:, :self.period1, 0]
+        period2_mask = self.seas_mask[:, :self.period2, 1]
+
+        Ic = []
+        wc = []
+        for i in range(self.bs):
+            Ic += [self.init_Ic[period1_mask[i, :]]]
+            wc += [self.init_wc[period2_mask[i, :]]]
+
+        self.Ic = torch.stack(Ic, 0).unsqueeze(2)
+        self.wc = torch.stack(wc, 0).unsqueeze(2)
 
         self.t, self.s = add_init_level_trend(self.x, self.period1, self.period2)
 
@@ -51,22 +60,18 @@ class HWStatefulContainer(BaseStatefulContainer):
 
     def step(self, i, state):
 
-        bi = torch.arange(0, self.bs)  # batch index, matching seasonal mask index. Single item selection.
-        si1 = self.seas_mask[:, i, 0]
-        si2 = self.seas_mask[:, i, 1]
-
         residual_pred = state['residual_pred'] if state and 'residual_pred' in state else 0  # TODO: mult vs add
 
-        yh = (self.s + self.t) + self.Ic[bi, si1, :] + self.wc[bi, si2, :]
+        yh = (self.s + self.t) + self.Ic[:, i % self.period1, :] + self.wc[:, i % self.period2, :]
         self.yhat[:, i, :] = yh + residual_pred  # apply fix from the last iteration
-        snew = self.alphas * (self.x[:, i, :] - (self.Ic[bi, si1, :] + self.wc[bi, si2, :] + residual_pred)) + (1 - self.alphas) * (self.s + self.t)
+        snew = self.alphas * (self.x[:, i, :] - (self.Ic[:, i % self.period1, :] + self.wc[:, i % self.period2, :] + residual_pred)) + (1 - self.alphas) * (self.s + self.t)
         tnew = self.betas * (snew - self.s) + (1 - self.betas) * self.t
 
         Ico = self.Ic.clone()
         wco = self.wc.clone()
 
-        Ico[bi, si1, :] = self.gammas * (self.x[:, i, :] - (snew + self.wc[bi, si2, :] + residual_pred)) + (1 - self.gammas) * self.Ic[bi, si1, :]
-        wco[bi, si2, :] = self.omegas * (self.x[:, i, :] - (snew + self.Ic[bi, si1, :] + residual_pred)) + (1 - self.omegas) * self.wc[bi, si2, :]
+        Ico[:, i % self.period1, :] = self.gammas * (self.x[:, i, :] - (snew + self.wc[:, i % self.period2, :] + residual_pred)) + (1 - self.gammas) * self.Ic[:, i % self.period1, :]
+        wco[:, i % self.period2, :] = self.omegas * (self.x[:, i, :] - (snew + self.Ic[:, i % self.period1, :] + residual_pred)) + (1 - self.omegas) * self.wc[:, i % self.period2, :]
         self.Ic = Ico
         self.wc = wco
 
@@ -87,19 +92,15 @@ class HWStatefulContainer(BaseStatefulContainer):
         return state
 
     def forecast(self, h):
+        Ic = torch.roll(self.Ic, -self.n % self.period1, dims=1)
+        wc = torch.roll(self.wc, -self.n % self.period2, dims=1)
 
         t = self.t
         s = self.s
 
-        sm1 = self.seas_mask[:, self.n:, 0]
-        sm2 = self.seas_mask[:, self.n:, 1]
-
-        # batch index, matching seasonal mask index. Multiple item selection.
-        bi = torch.arange(self.bs).view(-1, 1).repeat(1, sm1.size(1))
-
         ca = s.view(self.bs, 1, self.f) + torch.arange(1, h + 1).float().view(1, -1, 1).repeat(self.bs, 1, self.f) * t.view(self.bs, 1, self.f)
-        cb = self.Ic[bi, sm1]
-        cc = self.wc[bi, sm2]
+        cb = Ic.repeat(1, h // self.period1 + 1, 1)[:, :h, :]
+        cc = wc.repeat(1, h // self.period2 + 1, 1)[:, :h, :]
 
         return ca + cb + cc
 
@@ -115,13 +116,13 @@ class HWStatefulContainer(BaseStatefulContainer):
         }
 
 
-class DSHWAdditiveLearner(BaseLearner):
+class DSHWOffsetBasedAdditiveLearner(BaseLearner):
     """
 
     TODO:
     - version without trend
     """
-    STATEFUL_CONTAINER_CLASS = HWStatefulContainer
+    STATEFUL_CONTAINER_CLASS = HWOffsetBasedStatefulContainer
 
     def __init__(self, period1, period2, h,
                  enable_hw_grad=True, enable_ar=False, enable_seas_grad=True):
