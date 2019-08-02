@@ -16,7 +16,7 @@ def gen_period_labels(period_len, cutby, rollby, ratio=0):
     return a[:, :cutby, :]
 
 
-def test_smoke_conv_learner(dataset_2_batch):
+def test_smoke_offset_vs_index_dshw(dataset_2_batch):
 
     loss_fn = nn.MSELoss()
     h = 24
@@ -38,7 +38,7 @@ def test_smoke_conv_learner(dataset_2_batch):
 
     # new impl
     model = PipelineModel([
-        DSHWAdditiveLearner(period1=dataset_2_batch.period1, period2=dataset_2_batch.period2, h=h),
+        DSHWAdditiveLearner(period1_dim=dataset_2_batch.period1, period2_dim=dataset_2_batch.period2, h=h),
     ], loss_fn=loss_fn)
 
     # that's actually the old implementation
@@ -50,4 +50,35 @@ def test_smoke_conv_learner(dataset_2_batch):
     out2 = model2.forward(x0, seas_mask, exog_cat0, exog_cnt0, y0)
 
     assert torch.allclose(out.forecast, out2.forecast)
+    out.loss_result.overall.backward()
     out2.loss_result.overall.backward()
+
+
+def test_smoke_no_trend(dataset_2_batch):
+
+    loss_fn = nn.MSELoss()
+    h = 24
+    xh = dataset_2_batch.torch_ts.size(1) + h
+
+    x0 = dataset_2_batch.torch_ts.view(2, -1, 1)
+
+    # sequences must match in length before concatenating them.
+    ratio = dataset_2_batch.period2 // dataset_2_batch.period1
+
+    seas_mask = torch.cat([
+        gen_period_labels(dataset_2_batch.period1, xh, ROLLBY_FOR_TEST_1, ratio=ratio).repeat(2, 1, 1),
+        gen_period_labels(dataset_2_batch.period2, xh, ROLLBY_FOR_TEST_2).repeat(2, 1, 1)
+    ], 2)
+
+    exog_cat0 = torch.empty(2, xh, 1)
+    exog_cnt0 = torch.empty(2, xh, 1)
+    y0 = None
+
+    # new impl
+    model = PipelineModel([
+        DSHWAdditiveLearner(period1_dim=dataset_2_batch.period1, period2_dim=dataset_2_batch.period2, h=h,
+                            enable_trend=False),
+    ], loss_fn=loss_fn)
+
+    out = model.forward(x0, seas_mask, exog_cat0, exog_cnt0, y0)
+    out.loss_result.overall.backward()

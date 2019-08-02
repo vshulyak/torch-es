@@ -15,7 +15,7 @@ def test_smoke_conv_learner(dataset_one):
     xh = dataset_one.torch_ts.size(0) + h
 
     model = PipelineModel([
-        DSHWAdditiveLearner(period1=dataset_one.period1, period2=dataset_one.period2, h=h),
+        DSHWAdditiveLearner(period1_dim=dataset_one.period1, period2_dim=dataset_one.period2, h=h),
         ExogConvLearner(cnt_input_dim=1)
     ], loss_fn=loss_fn)
 
@@ -40,7 +40,7 @@ def test_smoke_one_step_lstm_learner(dataset_one):
     xh = dataset_one.torch_ts.size(0) + h
 
     model = PipelineModel([
-        DSHWAdditiveLearner(period1=dataset_one.period1, period2=dataset_one.period2, h=h),
+        DSHWAdditiveLearner(period1_dim=dataset_one.period1, period2_dim=dataset_one.period2, h=h),
         OneStepLSTMLearner(cnt_input_dim=1)
     ], loss_fn=loss_fn)
 
