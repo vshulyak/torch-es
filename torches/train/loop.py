@@ -106,7 +106,7 @@ def train(model, phases, opt, loss_fn, epochs=1, grad_clip=10, log_n_last_epochs
                 sd = detach_state_dict(model.state_dict())
                 state_dicts.append(sd)
 
-                if len(state_dicts) >= log_n_last_epochs:
+                if len(state_dicts) > log_n_last_epochs:
                     del state_dicts[0]
 
         pb.epoch_ended(epoch)
