@@ -105,9 +105,21 @@ class HWStatefulContainer(BaseStatefulContainer):
         return level + trend + seas_1 + seas_2
 
     def get_losses(self, loss_fn):
-        return {
+        main_loss = {
             'es': loss_fn(self.x, self.yhat)
         }
+
+        # adds smoothing loss for the seasonalities: penalizes too big differences.
+        # another way to do this would be a smoothing spline penalty, via a second derivative (aka "double backprop"):
+        #     grad = torch.autograd.grad(loss, w)[0]
+        #     total_loss = loss + torch.norm(grad)
+        # but this is slow to compute and a bit awkward in my tests
+        if self.learner.enable_seas_smoothing:
+            return {**main_loss, **{
+                'smi': torch.norm(self.init_Ic[1:] - self.init_Ic[:-1]),
+                'smw': torch.norm(self.init_wc[1:] - self.init_wc[:-1]),
+            }}
+        return main_loss
 
     def get_history(self):
         return {
@@ -124,6 +136,7 @@ class DSHWAdditiveLearner(BaseLearner):
 
     def __init__(self, period1_dim, period2_dim, h,
                  enable_trend=True,
+                 enable_seas_smoothing=True,
                  enable_hw_grad=True, enable_ar=False, enable_seas_grad=True):
         super().__init__()
 
@@ -131,6 +144,7 @@ class DSHWAdditiveLearner(BaseLearner):
         self.period1_dim = period1_dim
         self.period2_dim = period2_dim
         self.enable_trend = enable_trend
+        self.enable_seas_smoothing = enable_seas_smoothing
         self.enable_ar = enable_ar
 
         self.alphas = nn.Parameter(siginv(torch.tensor([DEFAULT_PARAM_VALUE], requires_grad=enable_hw_grad)))
