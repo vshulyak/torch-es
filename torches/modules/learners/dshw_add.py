@@ -66,12 +66,12 @@ class HWStatefulContainer(BaseStatefulContainer):
         snew = self.alphas * (self.x[:, i, :] - (self.Ic[bi, si1, :] + self.wc[bi, si2, :] + residual_pred)) + (1 - self.alphas) * (self.s + self.t)
         tnew = self.betas * (snew - self.s) + (1 - self.betas) * self.t
 
+        self.s = snew
+        self.t = tnew if self.learner.enable_trend else torch.zeros(self.bs, 1)
+
         # these are inplace operations. In theory, gradients should fail for these. However, they don't for some reason in this case.
         self.Ic[bi, si1, :] = self.gammas * (self.x[:, i, :] - (snew + self.wc[bi, si2, :] + residual_pred)) + (1 - self.gammas) * self.Ic[bi, si1, :]
         self.wc[bi, si2, :] = self.omegas * (self.x[:, i, :] - (snew + self.Ic[bi, si1, :] + residual_pred)) + (1 - self.omegas) * self.wc[bi, si2, :]
-
-        self.s = snew
-        self.t = tnew
 
         if not state:
             state = {}
@@ -82,8 +82,8 @@ class HWStatefulContainer(BaseStatefulContainer):
             'residual': self.x[:, i, :] - yh
         })
 
-        self.t_history += [self.t.unsqueeze(1)]
-        self.s_history += [self.s.unsqueeze(1)]
+        self.t_history += [self.t]
+        self.s_history += [self.s]
         return state
 
     def forecast(self, h):
@@ -115,16 +115,21 @@ class HWStatefulContainer(BaseStatefulContainer):
         #     total_loss = loss + torch.norm(grad)
         # but this is slow to compute and a bit awkward in my tests
         if self.learner.enable_seas_smoothing:
+
+            sh = torch.stack(self.s_history, 1)
+
+            sl1 = torch.norm(self.init_Ic[1:] - self.init_Ic[:-1])
+            sl2 = torch.norm(self.init_wc[1:] - self.init_wc[:-1])
+            sl3 = torch.norm(sh[:, 1:, :] - sh[:, :-1, :]) / sh.size(1)
             return {**main_loss, **{
-                'smi': torch.norm(self.init_Ic[1:] - self.init_Ic[:-1]),
-                'smw': torch.norm(self.init_wc[1:] - self.init_wc[:-1]),
+                'sm': sl1 + sl2 + sl3,
             }}
         return main_loss
 
     def get_history(self):
         return {
-            't_history': torch.stack(self.t_history, 1).squeeze(3).detach(),  # why do I get 4 dim?
-            's_history': torch.stack(self.s_history, 1).squeeze(3).detach()
+            't_history': torch.stack(self.t_history, 1).detach(),
+            's_history': torch.stack(self.s_history, 1).detach()
         }
 
 
