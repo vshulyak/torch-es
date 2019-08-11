@@ -18,7 +18,7 @@ class OneStepLSTMStatefulContainer(BaseStatefulContainer):
 
     def step(self, i, state):
 
-        cur_residual = state['residual']
+        cur_residual = state['es_residual']
 
         out, self.hidden1, self.hidden2 = self.learner(cur_residual,
                                                        self.exog_cat[:, i, :], self.exog_cnt[:, i, :],
@@ -28,7 +28,7 @@ class OneStepLSTMStatefulContainer(BaseStatefulContainer):
         self.outs += [out]
 
         state.update({
-            'residual_pred': out
+            'intervention_term': out
         })
 
         return state
@@ -63,7 +63,9 @@ class OneStepLSTMStatefulContainer(BaseStatefulContainer):
 
         fc = torch.stack(fc, 1)
 
-        return fc
+        return {
+            'lstm': fc
+        }
 
 
 class OneStepLSTMLearner(BaseLearner):

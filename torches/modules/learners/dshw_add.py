@@ -59,27 +59,28 @@ class HWStatefulContainer(BaseStatefulContainer):
         si1 = self.seas_mask[:, i, 0]
         si2 = self.seas_mask[:, i, 1]
 
-        residual_pred = state['residual_pred'] if state and 'residual_pred' in state else 0  # TODO: mult vs add
+        intervention_term = state['intervention_term'] if 'intervention_term' in state else 0  # TODO: mult vs add
 
         yh = (self.s + self.t) + self.Ic[bi, si1, :] + self.wc[bi, si2, :]
-        self.yhat[:, i, :] = yh + residual_pred  # apply fix from the last iteration
-        snew = self.alphas * (self.x[:, i, :] - (self.Ic[bi, si1, :] + self.wc[bi, si2, :] + residual_pred)) + (1 - self.alphas) * (self.s + self.t)
+        self.yhat[:, i, :] = yh + intervention_term  # apply fix from the last iteration
+        snew = self.alphas * (self.x[:, i, :] - (self.Ic[bi, si1, :] + self.wc[bi, si2, :] + intervention_term)) + (1 - self.alphas) * (self.s + self.t)
         tnew = self.betas * (snew - self.s) + (1 - self.betas) * self.t
 
         self.s = snew
         self.t = tnew if self.learner.enable_trend else torch.zeros(self.bs, 1)
 
         # these are inplace operations. In theory, gradients should fail for these. However, they don't for some reason in this case.
-        self.Ic[bi, si1, :] = self.gammas * (self.x[:, i, :] - (snew + self.wc[bi, si2, :] + residual_pred)) + (1 - self.gammas) * self.Ic[bi, si1, :]
-        self.wc[bi, si2, :] = self.omegas * (self.x[:, i, :] - (snew + self.Ic[bi, si1, :] + residual_pred)) + (1 - self.omegas) * self.wc[bi, si2, :]
+        self.Ic[bi, si1, :] = self.gammas * (self.x[:, i, :] - (snew + self.wc[bi, si2, :] + intervention_term)) + (1 - self.gammas) * self.Ic[bi, si1, :]
+        self.wc[bi, si2, :] = self.omegas * (self.x[:, i, :] - (snew + self.Ic[bi, si1, :] + intervention_term)) + (1 - self.omegas) * self.wc[bi, si2, :]
 
         if not state:
             state = {}
 
         state.update({
-            's': self.s,
-            't': self.t,
-            'residual': self.x[:, i, :] - yh
+            'es_s': self.s,
+            'es_t': self.t,
+            'es_yhat': self.yhat[:, i, :],
+            'es_residual': self.x[:, i, :] - yh
         })
 
         self.t_history += [self.t]
@@ -102,7 +103,9 @@ class HWStatefulContainer(BaseStatefulContainer):
         seas_1 = self.Ic[bi, sm1]
         seas_2 = self.wc[bi, sm2]
 
-        return level + trend + seas_1 + seas_2
+        return {
+            'es': level + trend + seas_1 + seas_2
+        }
 
     def get_losses(self, loss_fn):
         main_loss = {
@@ -128,8 +131,8 @@ class HWStatefulContainer(BaseStatefulContainer):
 
     def get_history(self):
         return {
-            't_history': torch.stack(self.t_history, 1).detach(),
-            's_history': torch.stack(self.s_history, 1).detach()
+            'dshw_t_history': torch.stack(self.t_history, 1).detach(),
+            'dshw_s_history': torch.stack(self.s_history, 1).detach()
         }
 
 
@@ -142,7 +145,8 @@ class DSHWAdditiveLearner(BaseLearner):
     def __init__(self, period1_dim, period2_dim, h,
                  enable_trend=True,
                  enable_seas_smoothing=True,
-                 enable_hw_grad=True, enable_ar=False, enable_seas_grad=True):
+                 enable_hw_grad=True, enable_ar=False, enable_seas_grad=True,
+                 out_name='intervention_term'):
         super().__init__()
 
         self.h = h
@@ -151,6 +155,7 @@ class DSHWAdditiveLearner(BaseLearner):
         self.enable_trend = enable_trend
         self.enable_seas_smoothing = enable_seas_smoothing
         self.enable_ar = enable_ar
+        self.out_name = out_name
 
         self.alphas = nn.Parameter(siginv(torch.tensor([DEFAULT_PARAM_VALUE], requires_grad=enable_hw_grad)))
         self.betas = nn.Parameter(siginv(torch.tensor([DEFAULT_PARAM_VALUE], requires_grad=enable_hw_grad)))

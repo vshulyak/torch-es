@@ -16,7 +16,8 @@ def test_smoke_conv_learner(dataset_one):
 
     model = PipelineModel([
         DSHWAdditiveLearner(period1_dim=dataset_one.period1, period2_dim=dataset_one.period2, h=h),
-        ExogConvLearner(cnt_input_dim=1)
+        ExogConvLearner(cnt_input_dim=1),
+        # RenameStateItem({'exog_conv', 'intervention_term'})
     ], loss_fn=loss_fn)
 
     x0 = dataset_one.torch_ts.view(1, -1, 1)

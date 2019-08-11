@@ -23,6 +23,12 @@ class BaseStatefulContainer(object):
     def step(self, i, state):
         raise NotImplemented
 
+    def get_uncertainty(self, forecast):
+        return {
+            'ih': None,
+            'il': None
+        }
+
     def get_history(self):
         return {}
 
