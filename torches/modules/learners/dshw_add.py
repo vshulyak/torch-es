@@ -27,24 +27,24 @@ def add_init_level_trend(y, period1_dim, period2_dim, enable_trend):
 
 class HWStatefulContainer(BaseStatefulContainer):
 
-    def __init__(self, learner, x, seas_mask, exog_cat, exog_cnt):
-        super().__init__(learner, x, seas_mask, exog_cat, exog_cnt)
+    def init(self):
 
         self.yhat = torch.empty((self.bs, self.n, self.f))
 
-        self.init_Ic = learner.init_Ic
-        self.init_wc = learner.init_wc
+        # set the initial seasonality
+        self.init_Ic = self.learner.init_Ic
+        self.init_wc = self.learner.init_wc
 
-        self.period1_dim = learner.period1_dim
-        self.period2_dim = learner.period2_dim
+        self.period1_dim = self.learner.period1_dim
+        self.period2_dim = self.learner.period2_dim
 
-        self.alphas = torch.sigmoid(learner.alphas)
-        self.betas = torch.sigmoid(learner.betas)
-        self.gammas = torch.sigmoid(learner.gammas)
-        self.omegas = torch.sigmoid(learner.omegas)
+        # limit the range of HW coeffs
+        self.alphas = torch.sigmoid(self.learner.alphas)
+        self.betas = torch.sigmoid(self.learner.betas)
+        self.gammas = torch.sigmoid(self.learner.gammas)
+        self.omegas = torch.sigmoid(self.learner.omegas)
 
-    def init(self):
-
+        # init the seasonalities, which will be updated during the sequence scan
         self.Ic = self.init_Ic.view(1, -1, 1).repeat(self.bs, 1, 1)
         self.wc = self.init_wc.view(1, -1, 1).repeat(self.bs, 1, 1)
 
@@ -62,7 +62,7 @@ class HWStatefulContainer(BaseStatefulContainer):
         intervention_term = state['intervention_term'] if 'intervention_term' in state else 0  # TODO: mult vs add
 
         yh = (self.s + self.t) + self.Ic[bi, si1, :] + self.wc[bi, si2, :]
-        self.yhat[:, i, :] = yh + intervention_term  # apply fix from the last iteration
+        self.yhat[:, i, :] = yh + intervention_term  # apply fix from an external learner
         snew = self.alphas * (self.x[:, i, :] - (self.Ic[bi, si1, :] + self.wc[bi, si2, :] + intervention_term)) + (1 - self.alphas) * (self.s + self.t)
         tnew = self.betas * (snew - self.s) + (1 - self.betas) * self.t
 
@@ -145,7 +145,7 @@ class HWStatefulContainer(BaseStatefulContainer):
 
 class DSHWAdditiveLearner(BaseLearner):
     """
-
+    Double Seasonal Holt Winters learner
     """
     STATEFUL_CONTAINER_CLASS = HWStatefulContainer
 
