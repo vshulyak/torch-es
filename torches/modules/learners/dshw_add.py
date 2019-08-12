@@ -153,7 +153,7 @@ class DSHWAdditiveLearner(BaseLearner):
                  enable_trend=True,
                  enable_main_loss=True,
                  enable_seas_smoothing=True,
-                 enable_hw_grad=True, enable_ar=False, enable_seas_grad=True,
+                 enable_hw_grad=True, enable_seas_grad=True,
                  out_name='intervention_term'):
         super().__init__()
 
@@ -163,14 +163,12 @@ class DSHWAdditiveLearner(BaseLearner):
         self.enable_trend = enable_trend
         self.enable_main_loss = enable_main_loss
         self.enable_seas_smoothing = enable_seas_smoothing
-        self.enable_ar = enable_ar
         self.out_name = out_name
 
         self.alphas = nn.Parameter(siginv(torch.tensor([DEFAULT_PARAM_VALUE], requires_grad=enable_hw_grad)))
         self.betas = nn.Parameter(siginv(torch.tensor([DEFAULT_PARAM_VALUE], requires_grad=enable_hw_grad)))
         self.gammas = nn.Parameter(siginv(torch.tensor([DEFAULT_PARAM_VALUE], requires_grad=enable_hw_grad)))
         self.omegas = nn.Parameter(siginv(torch.tensor([DEFAULT_PARAM_VALUE], requires_grad=enable_hw_grad)))
-        self.phis = nn.Parameter(siginv(torch.tensor([DEFAULT_PARAM_VALUE], requires_grad=enable_hw_grad)))
 
         # can be initialized later (optional)
         self.init_Ic = nn.Parameter(torch.zeros(period1_dim, requires_grad=enable_seas_grad))
