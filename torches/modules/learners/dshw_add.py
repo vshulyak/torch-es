@@ -108,9 +108,14 @@ class HWStatefulContainer(BaseStatefulContainer):
         }
 
     def get_losses(self, loss_fn):
-        main_loss = {
-            'es': loss_fn(self.x, self.yhat)
-        }
+
+        losses = {}
+
+        # main loss can be disabled to allow for customizations later in the pipeline
+        if self.learner.enable_main_loss:
+            losses.update({
+                'es': loss_fn(self.x, self.yhat)
+            })
 
         # adds smoothing loss for the seasonalities: penalizes too big differences.
         # another way to do this would be a smoothing spline penalty, via a second derivative (aka "double backprop"):
@@ -124,10 +129,12 @@ class HWStatefulContainer(BaseStatefulContainer):
             sl1 = torch.norm(self.init_Ic[1:] - self.init_Ic[:-1])
             sl2 = torch.norm(self.init_wc[1:] - self.init_wc[:-1])
             sl3 = torch.norm(sh[:, 1:, :] - sh[:, :-1, :]) / sh.size(1)
-            return {**main_loss, **{
+
+            losses.update({
                 'sm': sl1 + sl2 + sl3,
-            }}
-        return main_loss
+            })
+
+        return losses
 
     def get_history(self):
         return {
@@ -144,6 +151,7 @@ class DSHWAdditiveLearner(BaseLearner):
 
     def __init__(self, period1_dim, period2_dim, h,
                  enable_trend=True,
+                 enable_main_loss=True,
                  enable_seas_smoothing=True,
                  enable_hw_grad=True, enable_ar=False, enable_seas_grad=True,
                  out_name='intervention_term'):
@@ -153,6 +161,7 @@ class DSHWAdditiveLearner(BaseLearner):
         self.period1_dim = period1_dim
         self.period2_dim = period2_dim
         self.enable_trend = enable_trend
+        self.enable_main_loss = enable_main_loss
         self.enable_seas_smoothing = enable_seas_smoothing
         self.enable_ar = enable_ar
         self.out_name = out_name
