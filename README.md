@@ -23,7 +23,7 @@ This repo contains:
 
 This is just part of the code which proved to be at least somewhat useful.
 
-# Differences Slawek's version and this one
+# Differences between Slawek's version and this one
 
 I never had an idea to reproduce the complete M4 prediction results (although it's a nice approach to validate the algorithm).
 
